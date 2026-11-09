@@ -23,7 +23,7 @@ if (-not $cfg) {
     $ip = Read-Host 'Primeira vez: digite o IP do servidor Oracle (ex.: 129.146.10.20) e aperte Enter'
     $alvo = "ubuntu@$($ip.Trim())"
   }
-  $cfg = [pscustomobject]@{ target = $alvo; key = 'C:\Users\da338\OneDrive\Desktop\vpss\ssh-key-2026-02-13.key'; path = '/home/ubuntu/radar' }
+  $cfg = [pscustomobject]@{ target = $alvo; key = $(if ($env:RADAR_SSH_KEY) { $env:RADAR_SSH_KEY } else { Join-Path $env:USERPROFILE '.ssh\id_ed25519' }); path = '/home/ubuntu/radar' }
   $cfg | ConvertTo-Json | Set-Content -Path $cfgFile -Encoding UTF8
   Log "Servidor salvo em deploy\servidor.local.json: $($cfg.target)"
 }
@@ -63,3 +63,4 @@ $tmp = Join-Path $env:TEMP 'radar-remoto.sh'; [IO.File]::WriteAllText($tmp, $rem
 $saida = cmd /c "ssh $sshOpts $($cfg.target) bash -s < `"$tmp`" 2>&1"
 $saida | ForEach-Object { Log $_ }
 if ($saida -match '== FIM OK') { Log 'PRONTO: Radar atualizado no servidor.' } else { Log 'ATENÇÃO: a atualização não terminou. Veja acima.' }
+

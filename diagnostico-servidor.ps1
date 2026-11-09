@@ -3,7 +3,7 @@
 $ErrorActionPreference = 'Continue'
 $pasta = Split-Path -Parent $MyInvocation.MyCommand.Path
 $saida = Join-Path $pasta 'diagnostico-servidor.txt'
-$chavePadrao = 'C:\Users\da338\OneDrive\Desktop\vpss\ssh-key-2026-02-13.key'
+$chavePadrao = $(if ($env:RADAR_SSH_KEY) { $env:RADAR_SSH_KEY } else { Join-Path $env:USERPROFILE '.ssh\id_ed25519' })
 
 $alvo = $null; $chave = $null; $porta = $null
 $hist = Join-Path $env:APPDATA 'Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt'
@@ -45,3 +45,4 @@ $resultado = $remoto | & ssh @args2 2>&1 | Out-String
 "Servidor: $alvo`nData: $(Get-Date)`n`n$resultado" | Set-Content -Path $saida -Encoding UTF8
 Write-Host ''
 if ($resultado -match '== FIM') { Write-Host "Pronto! Resultado salvo em $saida. Pode voltar para o chat." } else { Write-Host 'A conexao nao completou. O que aconteceu esta em diagnostico-servidor.txt.'; Write-Host $resultado }
+

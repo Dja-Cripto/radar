@@ -1,0 +1,4 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const src=fs.readFileSync('server.mjs','utf8');const a=src.indexOf('const clientSearchRuns=new Map();'),b=src.indexOf('async function leadsApi',a);let release,calls=0;
+const ctx={Map,Date,console,state:{integrations:{}},persistState:async()=>{},httpTools:{},jobCatalogForSignals:()=>[],senderInfo:()=>({}),searchCampaign:()=>{calls++;return new Promise(r=>release=r)}};
+vm.createContext(ctx);vm.runInContext(src.slice(a,b),ctx);const c={id:'test'};const first=ctx.beginClientSearch(c);assert.equal(c.searchJob.status,'running');assert.equal(ctx.beginClientSearch(c),first);await new Promise(r=>setImmediate(r));assert.equal(calls,1);release({added:3});await first;assert.equal(c.searchJob.status,'done');assert.equal(c.searchJob.stats.added,3);console.log('Busca em segundo plano, proteção contra duplicação e resultado: OK.');

@@ -338,6 +338,20 @@ function cleanCampaign(d,prev={}){
   c.updatedAt=new Date().toISOString();c.createdAt=prev.createdAt||c.updatedAt;
   return c;
 }
+const clientSearchRuns=new Map();
+function beginClientSearch(c){
+  if(clientSearchRuns.has(c.id))return clientSearchRuns.get(c.id);
+  c.searchJob={status:'running',startedAt:new Date().toISOString()};
+  const run=(async()=>{
+    try{
+      await persistState();
+      const stats=await searchCampaign(c,{http:httpTools,keys:state.integrations,state,jobCatalog:jobCatalogForSignals(),sender:senderInfo()});
+      c.searchJob={...c.searchJob,status:'done',stats,finishedAt:new Date().toISOString()};
+    }catch(e){c.searchJob={...c.searchJob,status:'failed',error:e.message,finishedAt:new Date().toISOString()};}
+    finally{clientSearchRuns.delete(c.id);await persistState();}
+  })();
+  clientSearchRuns.set(c.id,run);return run;
+}
 async function leadsApi(req,res,url){
   const parts=url.pathname.split('/').filter(Boolean);// api, campaigns|leads, id?, action?
   if(parts[1]==='campaigns'){
@@ -348,10 +362,10 @@ async function leadsApi(req,res,url){
     if(!c)return reply(res,404,{error:'Campanha não encontrada'});
     if(parts.length===3&&req.method==='PUT'){const d=await bodyJson(req);const i=state.campaigns.indexOf(c);state.campaigns[i]=cleanCampaign(d,c);await persistState();return reply(res,200,{campaign:state.campaigns[i]})}
     if(parts.length===3&&req.method==='DELETE'){state.campaigns=state.campaigns.filter(x=>x!==c);const removed=dropOrphanLeads();await persistState();return reply(res,200,{ok:true,removed})}
+    if(parts[3]==='search-status'&&req.method==='GET')return reply(res,200,c.searchJob||{status:'idle'});
     if(parts[3]==='search'&&req.method==='POST'){
-      const stats=await searchCampaign(c,{http:httpTools,keys:state.integrations,state,jobCatalog:jobCatalogForSignals(),sender:senderInfo()});
-      await persistState();
-      return reply(res,200,{stats,leads:Object.values(state.leads).filter(l=>l.campaignId===c.id)});
+      beginClientSearch(c).catch(e=>console.error('Busca de clientes:',e.message));
+      return reply(res,202,{status:'running'});
     }
     if(parts[3]==='regenerate'&&req.method==='POST'){let n=0;for(const l of Object.values(state.leads))if(l.campaignId===c.id&&!l.messagesEditedAt){l.messages=composeMessages(l,c,senderInfo());n++}await persistState();return reply(res,200,{updated:n})}
   }
@@ -711,7 +725,7 @@ async function clientsTick(){
       if(c.autoSearch===false||c.lastAutoSearchDay===bahiaDay())continue;
       // A tentativa fica registrada antes da consulta para evitar repetição e consumo de cota.
       c.lastAutoSearchDay=bahiaDay();await persistState();
-      try{await searchCampaign(c,{http:httpTools,keys:state.integrations,state,jobCatalog:jobCatalogForSignals(),sender:senderInfo()});}
+      try{await beginClientSearch(c);}
       catch(e){c.lastStats={errors:[e.message]};}
       await persistState();
     }

@@ -274,7 +274,10 @@ async function runSearch(){
   const n=(c.niches||[]).length*(c.pagesPerNiche||1);
   setLeadStatus(`Procurando ${(c.niches||[]).length} ${(c.niches||[]).length===1?"nicho":"nichos"} no Google Maps e conferindo os sites das empresas. Pode levar até ${Math.max(1,Math.ceil(n*0.4))} minuto(s)…`);
   try{
-    const r=await api(`/api/campaigns/${encodeURIComponent(c.id)}/search`,{method:"POST"});
+    await api(`/api/campaigns/${encodeURIComponent(c.id)}/search`,{method:"POST"});
+    let r;
+    do{await new Promise(resolve=>setTimeout(resolve,2500));r=await api(`/api/campaigns/${encodeURIComponent(c.id)}/search-status`);if(r.status==="running")setLeadStatus("Busca em andamento no servidor. Conferindo empresas e e-mails; aguarde…");}while(r.status==="running");
+    if(r.status==="failed")throw Error(r.error||"Não foi possível concluir a busca.");
     LS.busy=false;await loadLeads();LS.filter="new";renderLeads();
     const s=r.stats||{};
     setLeadStatus(`${s.added||0} empresas novas, ${s.updated||0} atualizadas${s.skippedBlocked?`, ${s.skippedBlocked} ignoradas por pedirem para não ser contatadas`:""}.${s.errors?.length?` Avisos: ${s.errors.join(" · ")}`:""}`,s.errors?.length?"warn":"");
